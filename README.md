@@ -9,7 +9,15 @@ Two complementary approaches were developed and evaluated:
 
 2. **All-LLM Approach**: Leverages an LLM to directly grade reports based on provided guidelines without the intermediate structured extraction step.
 
-Additionally, a third **Judge Approach** uses an LLM to evaluate which of the two results is more appropriate for each report, creating an ensemble system.
+3. **Hybrid Method**: Combines semi-algorithmic results with LLM judgment ("second-think") to come to a reasoned grade
+
+4. **Judge Method**: Evaluates the semialgo (1) and LLM (2) approaches to determine which is more appropriate as an ensemble system.
+
+## Features
+
+- **Multiple Grading Methods**: Semi-algorithmic, pure LLM, hybrid, and judge-based approaches
+- **Concurrent Processing**: High-performance batch processing with configurable worker threads
+- **Flexible Model Support**: Ollama used for local LLM server through its OpenAI-compatible API, ensuring privacy (though the data is still anonymised)
 
 ## Repository Contents  
 - scripts_audit/audit_cxr_v2.py: Python script implementing the grading approaches  
@@ -30,11 +38,155 @@ Data and Models
 - Evaluation Metrics: Exact agreement, within-1 agreement, Cohen's Kappa, correlation coefficients, MAE, RMSE, and clinical undergrading rates
 
 ## Results
-All three approaches yielded good results, with a Cohen Kappa of up to 0.466 for the Judge approach and a within-1 agreement of up to 98.0% for the Judge approach. If we group the gradings into three categories – 1/2 (within normal limits), 3 (abnormal) and 4/5 (urgent, actionable), the Cohen Kappa goes up to 0.524. The critical undergrading rate (approach rating <4 when it should be 4/5) was the lowest for the semialgorithmic grading at 5/46 cases.
+For the purposes of this project, the grades were further subdivided into 0: Normal (1-2), 1: Actionable (3, 4), 2: Critical (5).
+All four approaches yielded good results, with a Cohen Kappa of up to 0.928 for the LLM approach and 0.846 for the Hybrid approach. 
 
-## Usage
-To use these scripts:
+If we further group the metrics into normal (0) and abnormal (everything else), the Cohen Kappa remains the same. The ROC-AUC of the LLM approach was 0.966 and the ROC-AUC of the Hybrid approach was 0.933.
 
-1. Set up the required environment with dependencies
-2. Update API keys in the script (OpenAI key if necessary)
-3. Run the analysis notebook to evaluate results
+McNemar's test revealed a significant difference between the accuracy of the Hybrid and the Judge approach (p=0.004).
+
+## Technical Details
+
+### Installation
+
+#### Prerequisites
+- Python 3.8+
+- Access to OpenAI API or local Ollama installation
+
+#### Setup
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Prepare configuration files:
+   - `padchest_op.json`: Medical findings dictionary
+   - `padchest_tubes_lines.json`: Tubes and lines dictionary  
+   - `diagnoses.json`: Diagnoses dictionary
+
+### Usage
+
+#### Basic Example
+See batch_processing_eg.py for a basic example
+
+```python
+import pandas as pd
+import json
+from cxr_audit.grade_batch_async import BatchCXRProcessor
+
+# Load configuration dictionaries
+with open("padchest_op.json", "r") as f:
+    padchest = json.load(f)
+    
+with open("padchest_tubes_lines.json", "r") as f:
+    tubes_lines = json.load(f)
+
+with open("diagnoses.json", "r") as f:
+    diagnoses = json.load(f)
+
+# Load your data
+df = pd.read_csv("your_data.csv")
+
+# Initialize batch processor
+processor = BatchCXRProcessor(
+    findings_dict=padchest,
+    tubes_lines_dict=tubes_lines,
+    diagnoses_dict=diagnoses,
+    model_name="gpt-4o-mini",  # or "qwen3:32b-q4_K_M" for Ollama
+    base_url="https://api.openai.com/v1",  # or "http://localhost:11434/v1" for Ollama
+    api_key="your-api-key",  # or "dummy" for Ollama
+    max_workers=4,
+    rate_limit_delay=0.1
+)
+
+# Process the full pipeline
+result_df = processor.process_full_pipeline(df, report_column='REPORT_TEXT')
+
+# Save results
+result_df.to_csv("graded_reports.csv", index=False)
+```
+
+#### Individual Method Usage
+
+```python
+# Process only specific methods
+df_with_semialgo = processor.process_semialgo_batch(df, report_column='REPORT_TEXT')
+df_with_llm = processor.process_llm_batch(df, report_column='REPORT_TEXT')
+df_with_hybrid = processor.process_hybrid_batch(df, report_column='REPORT_TEXT')
+df_with_judge = processor.process_judge_batch(df, report_column='REPORT_TEXT')
+```
+
+#### Single Report Processing
+
+```python
+# Initialize single classifier
+classifier = CXRClassifier(
+    findings=padchest,
+    tubes_lines=tubes_lines,
+    diagnoses=diagnoses,
+    model_name="gpt-4o-mini"
+)
+
+# Grade single report
+report_text = "Your chest X-ray report text here"
+semialgo_result = classifier.gradeReportSemialgo(report_text)
+llm_result = classifier.gradeReportLLM(report_text)
+hybrid_result = classifier.gradeReportHybrid(report_text, semialgo_grade=3)
+```
+
+### Configuration
+
+#### Model Configuration
+- **OpenAI Models**: `gpt-4o-mini`, `gpt-4`, `gpt-3.5-turbo`
+- **Ollama Models**: Any compatible model (e.g., `qwen3:32b-q4_K_M`, `llama3.1:8b`)
+
+#### Performance Tuning
+- `max_workers`: Number of concurrent processing threads (default: 5)
+- `rate_limit_delay`: Delay between API calls in seconds (default: 0.1)
+
+#### Data Format
+Your input DataFrame should contain:
+- A text column with the chest X-ray reports
+- Optional ground truth columns for evaluation
+
+### File Structure
+
+```
+cxr_audit/
+├── lib_audit_cxr_v2.py      # Core CXRClassifier implementation
+├── grade_batch_async.py     # Batch processing with concurrency
+├── helpers.py               # Utility functions
+├── prompts.py              # LLM prompts and templates
+batch_processing_eg.py       # Example usage script
+requirements.txt            # Python dependencies
+README.md                   # This file
+```
+
+### Library Reference
+
+#### BatchCXRProcessor
+
+Main class for concurrent batch processing of CXR reports.
+
+##### Methods
+- `process_full_pipeline(df, report_column)`: Run complete grading pipeline
+- `process_semialgo_batch(df, report_column)`: Semi-algorithmic grading only
+- `process_llm_batch(df, report_column)`: Pure LLM grading only
+- `process_hybrid_batch(df, report_column)`: Hybrid grading only
+- `process_judge_batch(df, report_column)`: Judge-based comparison only
+
+#### CXRClassifier
+
+Core classifier for individual report processing.
+
+##### Methods
+- `gradeReportSemialgo(report_text)`: Semi-algorithmic approach
+- `gradeReportLLM(report_text)`: Pure LLM approach
+- `gradeReportHybrid(report_text, semialgo_grade)`: Hybrid approach
+- `gradeReportJudge(report_text, manual_grade, algo_grade, llm_grade)`: Judge approach
+
