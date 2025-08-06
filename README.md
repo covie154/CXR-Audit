@@ -56,7 +56,7 @@ McNemar's test revealed a significant difference between the accuracy of the Hyb
 #### Setup
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/covie154/CXR-Audit
    ```
 
 2. Install dependencies:
