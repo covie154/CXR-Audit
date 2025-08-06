@@ -142,7 +142,7 @@ hybrid_result = classifier.gradeReportHybrid(report_text, semialgo_grade=3)
 ### Configuration
 
 #### Model Configuration
-- **OpenAI Models**: `gpt-4o-mini`, `gpt-4`, `gpt-3.5-turbo`
+- **OpenAI Models**: Any compatible model (e.g. `o4-mini`)
 - **Ollama Models**: Any compatible model (e.g., `qwen3:32b-q4_K_M`, `llama3.1:8b`)
 
 #### Performance Tuning
@@ -157,14 +157,14 @@ Your input DataFrame should contain:
 ### File Structure
 
 ```
-cxr_audit/
-├── lib_audit_cxr_v2.py      # Core CXRClassifier implementation
-├── grade_batch_async.py     # Batch processing with concurrency
-├── helpers.py               # Utility functions
-├── prompts.py              # LLM prompts and templates
-batch_processing_eg.py       # Example usage script
-requirements.txt            # Python dependencies
-README.md                   # This file
+scripts_audit/
+├──cxr_audit/
+├──├── lib_audit_cxr_v2.py      # Core CXRClassifier implementation
+├──├── grade_batch_async.py     # Batch processing with concurrency
+├──├── helpers.py               # Utility functions
+├──├── prompts.py              # LLM prompts and templates
+├──batch_processing_eg.py       # Example usage script
+├──requirements.txt            # Python dependencies
 ```
 
 ### Library Reference
