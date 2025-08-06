@@ -32,10 +32,10 @@ Grading System (R)
 - R5: Critical, urgent follow-up required  
   
 Data and Models  
-- Dataset: 200 retrospectively obtained, anonymized CXR reports (100 hospital, 100 primary care)
+- Dataset: 1114 anonymised primary care CXR reports
 - Ground Truth: Expert radiologist annotation
-- Models: OpenAI o4-mini, Llama3.1-8B
-- Evaluation Metrics: Exact agreement, within-1 agreement, Cohen's Kappa, correlation coefficients, MAE, RMSE, and clinical undergrading rates
+- Models: Qwen3 32B, quantized to Q4_K_M, temperature=0.2, running on Ollama
+- Evaluation Metrics: Exact agreement, Cohen's Kappa, sensitivity, specificity, F1 score, ROC-AUC
 
 ## Results
 For the purposes of this project, the grades were further subdivided into 0: Normal (1-2), 1: Actionable (3, 4), 2: Critical (5).
